@@ -27,11 +27,9 @@
 #ifndef libnetstation_h
 #define libnetstation_h
 
-#include <cstring>
-#include <vector>
-
-#ifdef _WIN32
-#include <windows.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <winsock2.h> // Required for SOCKET type
+#pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library
 #endif
 
 namespace NetStation {
@@ -75,10 +73,10 @@ namespace NetStation {
 
     class Socket {
     protected:    
-	#ifndef _WIN32
-		int m_socket;    
-	#else    
+	#if defined(_WIN32) || defined(_WIN64)
 		SOCKET m_socket;
+	#else    
+		int m_socket;    
 	#endif
 	public:
         Socket();
@@ -128,7 +126,7 @@ namespace NetStation {
             bool disconnect();
             bool beginRecording();
             bool endRecording();
-            bool sendTrigger(const char *code);
+            bool sendTrigger(const char *code, long timeStamp, long msDuration);
     };
 }
 

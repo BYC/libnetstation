@@ -27,18 +27,13 @@
 #include <cstring>
 #include <cassert>
 
-#ifndef _WIN32
-#include <sys/time.h>
-#include <sys/types.h>
+#if defined(_WIN32) || defined(_WIN64)
+// #include <winsock2.h> // Already included from header for SOCKET type
+#else
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
-#else
-#pragma comment(lib,"ws2_32.lib")
-#include <winsock2.h>
-#include "gettimeofday.h"	// gettimeofday is required, but Windows does not provide it. 
-#endif						// If you don't use Windows it's not a problem, otherwise you need to provide an implementation.
+#endif
 
 #include "netstation.h"
 
@@ -65,7 +60,7 @@ namespace NetStation {
         // If we're already connected, disconnect cleanly first
         this->disconnect();
 
-		#ifdef _WIN32
+		#if defined(_WIN32) || defined(_WIN64)
 		WSADATA wsaData;	
 		if(WSAStartup(MAKEWORD(1,1),&wsaData) != 0){
 			std::cerr << "WSAStartup failed." << std::endl;
@@ -109,11 +104,11 @@ namespace NetStation {
     // Cleanup after ourselves. The destructor will call this for us if we forget to, but we should do it.
     void Socket::disconnect() {
         if (m_socket != 0) {
-			#ifndef _WIN32
-            close(m_socket);
-			#else
+			#if defined(_WIN32) || defined(_WIN64)
 			closesocket(m_socket);
 			WSACleanup();
+			#else
+            close(m_socket);
 			#endif
 			m_socket = 0;
         }
@@ -297,7 +292,6 @@ namespace NetStation {
     
     bool EGIConnection::connect(const char systemSpec[4], const char* address, unsigned short port) {
         bool didConnect = false;
-        timeval tv;
         try {
             if (!this->m_socketEx.connect(address, port)) {
                 throw std::runtime_error("this->m_socketEx.connect()");
@@ -305,15 +299,6 @@ namespace NetStation {
 
 			if (!this->m_socketEx.sendBeginSession( systemSpec )) {
                 throw std::runtime_error("this->m_socketEx.sendBeginSession()");
-            }
-
-			if (!this->m_socketEx.sendAttention()) {
-                throw std::runtime_error("this->m_socketEx.sendAttention()");
-            }
-
-			gettimeofday(&tv, 0);
-            if (!this->m_socketEx.sendTimeSynch( tv.tv_sec * 1000 + tv.tv_usec / 1000 )) {
-                throw std::runtime_error("this->m_socketEx.sendTimeSynch()");
             }
 
 			didConnect = true;
@@ -368,13 +353,14 @@ namespace NetStation {
         return didEndRecording;
     }
  
-    bool EGIConnection::sendTrigger(const char* code) {				
+	// Sends a four character code, a time stamp marking the elapsed time from the beginning of the experiment
+	// and a duration flag that specifies how long the event lasts
+	// EGI Documentation states that timestamps must be unique, and all durations must be at least one millisecond 
+    bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {				
 		Trigger trigger;
-        timeval tv;
         trigger.size = sizeof(trigger) - sizeof(trigger.size); // Include only data following the size parameter as part of the trigger's size. 
-        gettimeofday(&tv, 0);
-        trigger.startTime = tv.tv_sec * 1000 + tv.tv_usec / 1000;
-        trigger.duration = 1;
+        trigger.startTime = timeStamp;
+        trigger.duration = (msDuration >= 1 ? msDuration : 1);
         memcpy(&trigger.code[0], code, sizeof(trigger.code));
 		return (this->m_socketEx.sendAttention() && this->m_socketEx.sendTimeSynch(trigger.startTime) && this->m_socketEx.sendTrigger(trigger));		
 	}
