@@ -126,6 +126,7 @@ namespace NetStation {
             bool disconnect();
             bool beginRecording();
             bool endRecording();
+			bool sendSynch(long timeStamp);
             bool sendTrigger(const char *code, long timeStamp, long msDuration);
     };
 }

@@ -353,6 +353,10 @@ namespace NetStation {
         return didEndRecording;
     }
  
+	bool EGIConnection::sendSynch(long timeStamp) {
+		return this->m_socketEx.sendAttention() && this->m_socketEx.sendTimeSynch(timeStamp);
+	}
+
 	// Sends a four character code, a time stamp marking the elapsed time from the beginning of the experiment
 	// and a duration flag that specifies how long the event lasts
 	// EGI Documentation states that timestamps must be unique, and all durations must be at least one millisecond 
@@ -362,6 +366,6 @@ namespace NetStation {
         trigger.startTime = timeStamp;
         trigger.duration = (msDuration >= 1 ? msDuration : 1);
         memcpy(&trigger.code[0], code, sizeof(trigger.code));
-		return (this->m_socketEx.sendAttention() && this->m_socketEx.sendTimeSynch(trigger.startTime) && this->m_socketEx.sendTrigger(trigger));		
+		this->m_socketEx.sendTrigger(trigger);
 	}
 }
