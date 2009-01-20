@@ -366,6 +366,6 @@ namespace NetStation {
         trigger.startTime = timeStamp;
         trigger.duration = (msDuration >= 1 ? msDuration : 1);
         memcpy(&trigger.code[0], code, sizeof(trigger.code));
-		this->m_socketEx.sendTrigger(trigger);
+		return this->m_socketEx.sendTrigger(trigger);
 	}
 }
