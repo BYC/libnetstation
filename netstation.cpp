@@ -38,9 +38,10 @@
 #include "netstation.h"
 
 namespace NetStation {
-    const char kMac[4]   = {'M','A','C','-'};
-    const char kUnix[4]  = {'U','N','I','X'};
-    const char kIntel[4] = {'N','T','E','L'};
+
+	// NetStation supports "NTEL", "UNIX" and "MAC-", but "UNIX" and "MAC-" are both indicators for big endian
+	const char kLittleEndian[4]	= {'N','T','E','L'};	// Inform netstation that data is in little endian format
+	const char kBigEndian[4]	= {'U','N','I','X'};	// Inform netstation that data is in big endian format
 
     // Start of with a disconnected socket
     Socket::Socket() : m_socket(0) { 
@@ -268,28 +269,11 @@ namespace NetStation {
 
 		memcpy(&this->m_commandBuffer[offset], code, 4);
 		offset += 4;
-	
-		 
 		 
 		memset(&this->m_commandBuffer[offset], 0, 13);
 		offset += 13;
 		
-        return this->sendCommand(&this->m_commandBuffer[0], offset); 
-		
-		/*
-        size_t offset = 0;
-        
-        this->m_commandBuffer[offset] = kEventDataStream;
-        offset += sizeof(kEventDataStream);
-        
-        memcpy(&this->m_commandBuffer[offset], &trigger, sizeof(trigger));
-        offset += sizeof(trigger);
-		        		
-		memset(&this->m_commandBuffer[offset], 0, 13);
-		offset += 13;
-		
-        return this->sendCommand(&this->m_commandBuffer[0], offset); 
-		 */
+        return this->sendCommand(&this->m_commandBuffer[0], offset); 		
     }    
     
     //////////////////////////////////////////////////////////////////////////
@@ -369,14 +353,6 @@ namespace NetStation {
 	// and a duration flag that specifies how long the event lasts
 	// EGI Documentation states that timestamps must be unique, and all durations must be at least one millisecond 
     bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {				
-/*
-		Trigger trigger;
-        trigger.size = 25; // We need to send a complete *event*
-        trigger.startTime = timeStamp;
-        trigger.duration = (msDuration >= 1 ? msDuration : 1);
-        memcpy(&trigger.code[0], code, sizeof(trigger.code));		
-		return this->m_socketEx.sendTrigger(trigger);
-*/
 		return this->m_socketEx.sendTrigger(code, timeStamp, msDuration);
 	}
 }

@@ -32,10 +32,9 @@
 #pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library
 #endif
 
-namespace NetStation {    
-    extern const char kMac[4];
-    extern const char kUnix[4];
-    extern const char kIntel[4];
+namespace NetStation {    	
+	extern const char kLittleEndian[4];
+	extern const char kBigEndian[4];
 
     class Socket {
     protected:    
