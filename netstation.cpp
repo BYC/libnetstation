@@ -22,14 +22,12 @@
  THE SOFTWARE. 
  */
 
-#include <iostream>
-#include <stdexcept>
 #include <cstring>
-#include <cassert>
 
 #if defined(_WIN32) || defined(_WIN64)
 // #include <winsock2.h> // Already included from header for SOCKET type
 #else
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -42,82 +40,22 @@ namespace NetStation {
 	// NetStation supports "NTEL", "UNIX" and "MAC-", but "UNIX" and "MAC-" are both indicators for big endian
 	const char kLittleEndian[4]	= {'N','T','E','L'};	// Inform netstation that data is in little endian format
 	const char kBigEndian[4]	= {'U','N','I','X'};	// Inform netstation that data is in big endian format
-
-    // Start of with a disconnected socket
-    Socket::Socket() : m_socket(0) { 
-    }
     
-    // And close our socket when we go out of scope
-    Socket::~Socket() { 
-        this->disconnect(); 
-    }
+    // EGIConnection
+    const char EGIConnection::kQuery           = 'Q';
+    const char EGIConnection::kExit            = 'X';
+    const char EGIConnection::kBeginRecording  = 'B';
+    const char EGIConnection::kEndRecording    = 'E';
+    const char EGIConnection::kAttention       = 'A';
+    const char EGIConnection::kTimeSynch       = 'T';
+    const char EGIConnection::kEventDataStream = 'D';
     
-    // Handle the connection sequence to NetStation
-    bool Socket::connect(const char *address, unsigned short port) {
-		int noDelay = 1;
-        bool didConnect = false;
-        struct sockaddr_in destination;
+    const char EGIConnection::kQuerySuccess    = 'I';
+    const char EGIConnection::kSuccess         = 'Z';
+    const char EGIConnection::kFailure         = 'F';
 
-        // If we're already connected, disconnect cleanly first
-        this->disconnect();
-
-		#if defined(_WIN32) || defined(_WIN64)
-		WSADATA wsaData;	
-		if(WSAStartup(MAKEWORD(1,1),&wsaData) != 0){
-			std::cerr << "WSAStartup failed." << std::endl;
-			exit(1);
-		}
-		#endif
-
-        try {
-            // Try to obtain a socket from the OS, if we fail, throw an exception.
-            m_socket = socket(PF_INET, SOCK_STREAM, 0);
-            if (m_socket == 0) throw std::runtime_error("socket");
-		
-			// Disable Nagleing for faster transmission... Increases amount of data being sent per moment in time, in exchange for lower latency
-			// If this fails, who cares?
-			setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&noDelay, sizeof(int));
-		
-            // Setup the destination for our socket
-            destination.sin_family = AF_INET;
-            destination.sin_port = htons(port);
-            destination.sin_addr.s_addr = inet_addr(address);
-            memset(destination.sin_zero, '\0', sizeof(destination.sin_zero));
-        
-            // Try to connect... if there is no one "listen"ing on the other end this will fail.
-            int result = ::connect(m_socket, (struct sockaddr*) &destination, sizeof(destination));
-            if (result != 0) throw std::runtime_error("connect");
-        
-            // We connected!
-            didConnect = true;
-			
-        }
-        // Cleanup after ourselves if an error occurred
-        catch (std::runtime_error& problem) {
-            std::cerr << problem.what() << std::endl;
-            this->disconnect();
-            didConnect = false;
-        }
-            
-        return didConnect;
-    }
-        
-    // Cleanup after ourselves. The destructor will call this for us if we forget to, but we should do it.
-    void Socket::disconnect() {
-        if (m_socket != 0) {
-			#if defined(_WIN32) || defined(_WIN64)
-			closesocket(m_socket);
-			WSACleanup();
-			#else
-            close(m_socket);
-			#endif
-			m_socket = 0;
-        }
-    }
-
-    
-    // The C function "send" may not send all of the data passed to it. Loop until everything is away or an error occurs.
-    size_t Socket::sendComplete(const char *data, size_t dataSize) const {
+	// The C function "send" may not send all of the data passed to it. Loop until everything is away or an error occurs.
+    size_t EGIConnection::sendComplete(const char *data, size_t dataSize) const {
         int dataSent = 0;
         int errorCode = 0;
         
@@ -130,12 +68,11 @@ namespace NetStation {
         return dataSent;
     }
     
-
     // The C function "recv" may not recv all of the data sent to it. Loop until everything is here or an error occurs.
-    size_t Socket::recvComplete(char *data, size_t dataSize) const {
+    size_t EGIConnection::recvComplete(char *data, size_t dataSize) const {
         int dataRecv = 0;
         int errorCode = 0;
-    
+		
         while (size_t(dataRecv) < dataSize) {
             errorCode = ::recv(m_socket, &data[dataRecv], int(dataSize - dataRecv), 0);
             if (errorCode > 0) dataRecv += errorCode;
@@ -144,27 +81,9 @@ namespace NetStation {
         
         return dataRecv;
     }
-
-
-    /////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    
-    // SocketEx
-    const char SocketEx::kQuery           = 'Q';
-    const char SocketEx::kExit            = 'X';
-    const char SocketEx::kBeginRecording  = 'B';
-    const char SocketEx::kEndRecording    = 'E';
-    const char SocketEx::kAttention       = 'A';
-    const char SocketEx::kTimeSynch       = 'T';
-    const char SocketEx::kEventDataStream = 'D';
-    
-    const char SocketEx::kQuerySuccess    = 'I';
-    const char SocketEx::kSuccess         = 'Z';
-    const char SocketEx::kFailure         = 'F';
-
-    bool SocketEx::sendCommand(const char *command, const size_t commandSize) const {
-        // Assume the command didn't get through
-        bool didSendCommand = false;
+	
+    bool EGIConnection::sendCommand(const char *command, const size_t commandSize) const {
+        bool didSendCommand = true;
         
         // The response message we receive from netstation
         char responseCode = 0;
@@ -175,43 +94,93 @@ namespace NetStation {
         // Failure response with an error code
         short responseError = 0;
 
-        try {
-            // 2) Send any accompanying data, if any
-            if (command != 0) {
-                if (this->sendComplete(command, commandSize) != commandSize) {
-                    throw std::runtime_error("sendComplete");
-                }
-            }
-            
-            // 3) Receive the response code
-			if (this->recvComplete(&responseCode, sizeof(responseCode)) != sizeof(responseCode)) {
-                throw std::runtime_error("recvComplete: responseCode");
-            }
-
-            // 4) Receive any additional response data
-            if (responseCode == kQuerySuccess) {
-                if (this->recvComplete((char*)&responseVersion, sizeof(responseVersion)) != sizeof(responseVersion)) {
-                    throw std::runtime_error("recvComplete: responseVersion");
-                }
-            }
-            else if (responseCode == kFailure) {
-				if (this->recvComplete((char*)&responseError, sizeof(responseError)) != sizeof(responseError)) {
-                    throw std::runtime_error("recvComplete: responseError");
-                }
-            }
-			else if (responseCode != kSuccess) {
-				throw std::runtime_error("responseCode invalid"); // We should only see this if the NetStation protocol changes....
+		if (command != 0) {
+			if (this->sendComplete(command, commandSize) != commandSize) {
+				didSendCommand = false;
 			}
-            didSendCommand = true;
-        }
-        catch (std::runtime_error& problem) {
-			std::cerr << problem.what() << std::endl;
-        }
-        
-        return didSendCommand;
+		
+			// Receive the response code
+			if (didSendCommand && this->recvComplete(&responseCode, sizeof(responseCode)) != sizeof(responseCode)) {
+				didSendCommand = false;
+			}
+			
+			// Receive any additional response data
+			if (responseCode == kQuerySuccess) {
+				if (didSendCommand && this->recvComplete((char*)&responseVersion, sizeof(responseVersion)) != sizeof(responseVersion)) {
+					didSendCommand = false;
+				}
+			}
+			else if (responseCode == kFailure) {
+				if (didSendCommand && this->recvComplete((char*)&responseError, sizeof(responseError)) != sizeof(responseError)) {
+					didSendCommand = false;
+				}
+			}
+			else if (responseCode != kSuccess) {
+				didSendCommand = false; // We should only see this if the NetStation protocol changes....
+			}
+		}
+		return didSendCommand;
     }
+	
+	
+	EGIConnection::EGIConnection() : m_socket(0) {
+	}
+	
+	EGIConnection::~EGIConnection() {
+		this->disconnect();
+	}
 
-    bool SocketEx::sendBeginSession(const char systemSpec[4]) {
+	// Handle the connection sequence to NetStation
+    bool EGIConnection::connect(const char *address, unsigned short port) {
+		int noDelay = 1;
+        bool didConnect = true;
+        struct sockaddr_in destination = {0};
+		
+        // If we're already connected, disconnect cleanly first
+        this->disconnect();
+		
+		#if defined(_WIN32) || defined(_WIN64)
+		WSADATA wsaData;	
+		if(WSAStartup(MAKEWORD(1,1),&wsaData) != 0){
+			std::cerr << "WSAStartup failed." << std::endl;
+			exit(1);
+		}
+		#endif
+		
+		// Try to obtain a socket from the OS, if we fail, throw an exception.
+		m_socket = socket(PF_INET, SOCK_STREAM, 0);
+		if (m_socket == 0) didConnect = false;
+		
+		// Disable Nagleing for faster transmission... Increases amount of data being sent per moment in time, in exchange for lower latency
+		setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&noDelay, sizeof(int));
+		
+		// Setup the destination for our socket
+		destination.sin_family = AF_INET;
+		destination.sin_port = htons(port);
+		destination.sin_addr.s_addr = inet_addr(address);
+		memset(destination.sin_zero, '\0', sizeof(destination.sin_zero));
+		
+		// Try to connect... if there is no one "listen"ing on the other end this will fail.
+		int result = ::connect(m_socket, (struct sockaddr*) &destination, sizeof(destination));
+		if (result != 0) didConnect = false;
+		
+        return didConnect;
+    }
+	
+    // Cleanup after ourselves. The destructor will call this for us if we forget to, but we should do it.
+    void EGIConnection::disconnect() {
+        if (m_socket != 0) {
+			#if defined(_WIN32) || defined(_WIN64)
+			closesocket(m_socket);
+			WSACleanup();
+			#else
+            close(m_socket);
+			#endif
+			m_socket = 0;
+        }
+    }
+	
+    bool EGIConnection::sendBeginSession(const char systemSpec[4]) {
         size_t offset = 0;
         
         this->m_commandBuffer[offset] = kQuery;
@@ -223,23 +192,23 @@ namespace NetStation {
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
     
-    bool SocketEx::sendEndSession() const {
+    bool EGIConnection::sendEndSession() const {
         return this->sendCommand(&kExit, sizeof(kExit));
     }
 
-    bool SocketEx::sendBeginRecording() const {
+    bool EGIConnection::sendBeginRecording() const {
         return this->sendCommand(&kBeginRecording, sizeof(kBeginRecording));
     }
     
-    bool SocketEx::sendEndRecording() const {
+    bool EGIConnection::sendEndRecording() const {
         return this->sendCommand(&kEndRecording, sizeof(kEndRecording));
     }
     
-    bool SocketEx::sendAttention() const {
+    bool EGIConnection::sendAttention() const {
         return this->sendCommand(&kAttention, sizeof(kAttention));
-    }
+	}
     
-    bool SocketEx::sendSynch(long timeStamp) {
+    bool EGIConnection::sendSynch(long timeStamp) {
         size_t offset = 0;
 		        
         this->m_commandBuffer[offset] = kTimeSynch;
@@ -251,7 +220,7 @@ namespace NetStation {
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
 
-    bool SocketEx::sendTrigger(const char* code, long timeStamp, long msDuration) {
+    bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {
         size_t offset = 0;
 		
         this->m_commandBuffer[offset] = kEventDataStream;
@@ -273,86 +242,6 @@ namespace NetStation {
 		memset(&this->m_commandBuffer[offset], 0, 13);
 		offset += 13;
 		
-        return this->sendCommand(&this->m_commandBuffer[0], offset); 		
+        return this->sendCommand(&this->m_commandBuffer[0], offset); 	
     }    
-    
-    //////////////////////////////////////////////////////////////////////////
-    
-    bool EGIConnection::connect(const char systemSpec[4], const char* address, unsigned short port) {
-        bool didConnect = false;
-        try {
-            if (!this->m_socketEx.connect(address, port)) {
-                throw std::runtime_error("this->m_socketEx.connect()");
-            }
-
-			if (!this->m_socketEx.sendBeginSession( systemSpec )) {
-                throw std::runtime_error("this->m_socketEx.sendBeginSession()");
-            }
-
-			didConnect = true;
-        }
-        catch (std::runtime_error& problem) {
-			std::cerr << problem.what() << std::endl;
-        }
-        return didConnect;
-    }
-    
-    bool EGIConnection::disconnect() {
-        bool didDisconnect = false;
-        try {
-            if (!this->m_socketEx.sendEndSession()) {
-                throw std::runtime_error("this->m_socketEx.sendEndSession()");
-            }
-            this->m_socketEx.disconnect();
-            didDisconnect = true;
-        }
-        catch (std::runtime_error& problem) {  
-			std::cerr << problem.what() << std::endl;
-        }
-        
-        return didDisconnect;
-    }
-
-    bool EGIConnection::beginRecording() {
-        bool didBeginRecording = false;
-        try {
-            if (!this->m_socketEx.sendBeginRecording()) {
-                throw std::runtime_error("this->m_socketEx.sendBeginRecording()");
-            }
-            didBeginRecording = true;
-        }
-        catch(std::runtime_error& problem) {
-            std::cerr << problem.what() << std::endl;
-        }
-        return didBeginRecording;
-    }
-    
-    bool EGIConnection::endRecording() {
-        bool didEndRecording = false;
-        try {
-            if (!this->m_socketEx.sendEndRecording()) {
-                throw std::runtime_error("this->m_socketEx.sendEndRecording()");
-            }
-            didEndRecording = true;
-        }
-        catch(std::runtime_error& problem) {
-            std::cerr << problem.what() << std::endl;
-        }
-        return didEndRecording;
-    }
- 
-	bool EGIConnection::sendAttention() {
-		return this->m_socketEx.sendAttention();
-	}
-	
-	bool EGIConnection::sendSynch(long timeStamp) {
-		return this->m_socketEx.sendSynch(timeStamp);
-	}
-
-	// Sends a four character code, a time stamp marking the elapsed time from the beginning of the experiment
-	// and a duration flag that specifies how long the event lasts
-	// EGI Documentation states that timestamps must be unique, and all durations must be at least one millisecond 
-    bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {				
-		return this->m_socketEx.sendTrigger(code, timeStamp, msDuration);
-	}
 }

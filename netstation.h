@@ -27,51 +27,46 @@
 #ifndef libnetstation_h
 #define libnetstation_h
 
+namespace NetStation {    	
+	
 #if defined(_WIN32) || defined(_WIN64)
 #include <winsock2.h> // Required for SOCKET type
-#pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library
+//#pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library
+	typedef SOCKET NetStation_Socket_t;
+#else
+	typedef int NetStation_Socket_t;
 #endif
-
-namespace NetStation {    	
+	
 	extern const char kLittleEndian[4];
 	extern const char kBigEndian[4];
 
-    class Socket {
-    protected:    
-	#if defined(_WIN32) || defined(_WIN64)
-		SOCKET m_socket;
-	#else    
-		int m_socket;    
-	#endif
-	public:
-        Socket();
-        ~Socket();
-    
-        bool connect(const char *address, unsigned short port);
-        void disconnect();
-
-        size_t sendComplete(const char* data, size_t size) const;
-        size_t recvComplete(char* data, size_t size) const;        
-    };
-
-    class SocketEx : public Socket {
+    class EGIConnection {
     protected:
-        char m_commandBuffer[ 65536 + 3 ];
-    
-    public:
-        static const char kQuery;
+		static const char kQuery;
         static const char kExit;
         static const char kBeginRecording;
         static const char kEndRecording;
         static const char kAttention;
         static const char kTimeSynch;
         static const char kEventDataStream;
-    
+		
         static const char kQuerySuccess;
         static const char kSuccess;
         static const char kFailure;
 
+		NetStation_Socket_t m_socket;
+		char m_commandBuffer[ 65536 + 3 ];
+		
+		size_t sendComplete(const char* data, size_t size) const;
+        size_t recvComplete(char* data, size_t size) const;        
         bool sendCommand(const char *command, const size_t commandSize) const;
+		
+    public:
+		EGIConnection();
+		~EGIConnection();
+		
+		bool connect(const char *address, unsigned short port);
+		void disconnect();
         bool sendBeginSession(const char systemSpec[4]);
         bool sendEndSession() const;
         bool sendBeginRecording() const;
@@ -79,20 +74,6 @@ namespace NetStation {
         bool sendAttention() const;
         bool sendSynch(long timeStamp);
         bool sendTrigger(const char* code, long timeStamp, long msDuration);
-    };
-    
-    class EGIConnection {
-        protected: 
-            SocketEx m_socketEx;
-        
-        public:
-            bool connect(const char systemSpec[4], const char* address, unsigned short port);
-            bool disconnect();
-            bool beginRecording();
-            bool endRecording();
-			bool sendAttention();
-			bool sendSynch(long timeStamp);
-            bool sendTrigger(const char *code, long timeStamp, long msDuration);
     };
 }
 
