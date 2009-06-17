@@ -56,7 +56,7 @@ namespace NetStation {
 
     class SocketEx : public Socket {
     protected:
-        char m_commandBuffer[ 65536 + 1 ];
+        char m_commandBuffer[ 65536 + 3 ];
     
     public:
         static const char kQuery;
