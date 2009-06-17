@@ -238,19 +238,45 @@ namespace NetStation {
         return this->sendCommand(&kAttention, sizeof(kAttention));
     }
     
-    bool SocketEx::sendTimeSynch(int timeInMilliseconds) {
+    bool SocketEx::sendSynch(long timeStamp) {
         size_t offset = 0;
-        
+		        
         this->m_commandBuffer[offset] = kTimeSynch;
         offset += sizeof(kTimeSynch);
-        
-        memcpy(&this->m_commandBuffer[offset], &timeInMilliseconds, sizeof(timeInMilliseconds));
-        offset += sizeof(timeInMilliseconds);
-        
+   
+        memcpy(&this->m_commandBuffer[offset], &timeStamp, sizeof(timeStamp));
+        offset += sizeof(timeStamp);
+		
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
 
-    bool SocketEx::sendTrigger(Trigger& trigger) {
+    bool SocketEx::sendTrigger(const char* code, long timeStamp, long msDuration) {
+        size_t offset = 0;
+		
+        this->m_commandBuffer[offset] = kEventDataStream;
+        offset += sizeof(kEventDataStream);
+	
+		unsigned short dataSize = 25;
+		memcpy(&this->m_commandBuffer[offset], &dataSize, sizeof(dataSize));
+		offset += sizeof(dataSize);
+
+		memcpy(&this->m_commandBuffer[offset], &timeStamp, sizeof(timeStamp));
+		offset += sizeof(timeStamp);
+
+		memcpy(&this->m_commandBuffer[offset], &msDuration, sizeof(msDuration));
+		offset += sizeof(msDuration);
+
+		memcpy(&this->m_commandBuffer[offset], code, 4);
+		offset += 4;
+	
+		 
+		 
+		memset(&this->m_commandBuffer[offset], 0, 13);
+		offset += 13;
+		
+        return this->sendCommand(&this->m_commandBuffer[0], offset); 
+		
+		/*
         size_t offset = 0;
         
         this->m_commandBuffer[offset] = kEventDataStream;
@@ -258,35 +284,13 @@ namespace NetStation {
         
         memcpy(&this->m_commandBuffer[offset], &trigger, sizeof(trigger));
         offset += sizeof(trigger);
-        		
+		        		
+		memset(&this->m_commandBuffer[offset], 0, 13);
+		offset += 13;
+		
         return this->sendCommand(&this->m_commandBuffer[0], offset); 
-    }
-        
-    bool SocketEx::sendEvent(Event& event) {        
-        size_t offset = 0;
-
-        this->m_commandBuffer[offset] = kEventDataStream;        
-        offset += sizeof(kEventDataStream);
-        
-        memcpy(&this->m_commandBuffer[offset], &event.trigger, sizeof(event.trigger));
-        offset += sizeof(event.trigger);
-        
-        memcpy(&this->m_commandBuffer[offset], &event.label, sizeof(event.label.labelLength) + event.label.labelLength);
-        offset += sizeof(event.label.labelLength) + event.label.labelLength;
-        
-        memcpy(&this->m_commandBuffer[offset], &event.description, sizeof(event.description.descriptionLength) + event.description.descriptionLength);
-        offset += sizeof(event.description.descriptionLength) + sizeof(event.description.description);
-                
-        memcpy(&this->m_commandBuffer[offset], &event.key, sizeof(event.key.key) + sizeof(event.key.keyDataType) + sizeof(event.key.keyDataLength) + event.key.keyDataLength);
-        offset += sizeof(event.key.key) + sizeof(event.key.keyDataType) + sizeof(event.key.keyDataLength) + sizeof(event.key.keyData);
-        
-        return this->sendCommand(&this->m_commandBuffer[0], sizeof(kEventDataStream) + 
-                                                            sizeof(event.trigger) + 
-                                                            sizeof(event.label.labelLength) + event.label.labelLength + 
-                                                            sizeof(event.description.descriptionLength) + event.description.descriptionLength + 
-                                                            sizeof(event.key.key) + sizeof(event.key.keyDataType) + sizeof(event.key.keyDataLength) + event.key.keyDataLength);
-    }
-    
+		 */
+    }    
     
     //////////////////////////////////////////////////////////////////////////
     
@@ -353,19 +357,26 @@ namespace NetStation {
         return didEndRecording;
     }
  
+	bool EGIConnection::sendAttention() {
+		return this->m_socketEx.sendAttention();
+	}
+	
 	bool EGIConnection::sendSynch(long timeStamp) {
-		return this->m_socketEx.sendAttention() && this->m_socketEx.sendTimeSynch(timeStamp);
+		return this->m_socketEx.sendSynch(timeStamp);
 	}
 
 	// Sends a four character code, a time stamp marking the elapsed time from the beginning of the experiment
 	// and a duration flag that specifies how long the event lasts
 	// EGI Documentation states that timestamps must be unique, and all durations must be at least one millisecond 
     bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {				
+/*
 		Trigger trigger;
-        trigger.size = sizeof(trigger) - sizeof(trigger.size); // Include only data following the size parameter as part of the trigger's size. 
+        trigger.size = 25; // We need to send a complete *event*
         trigger.startTime = timeStamp;
         trigger.duration = (msDuration >= 1 ? msDuration : 1);
-        memcpy(&trigger.code[0], code, sizeof(trigger.code));
+        memcpy(&trigger.code[0], code, sizeof(trigger.code));		
 		return this->m_socketEx.sendTrigger(trigger);
+*/
+		return this->m_socketEx.sendTrigger(code, timeStamp, msDuration);
 	}
 }

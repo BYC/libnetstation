@@ -32,41 +32,7 @@
 #pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library
 #endif
 
-namespace NetStation {
-    
-	#pragma pack(push,1)
-    struct Trigger {
-        unsigned short size;
-        long startTime;
-        long duration;
-        char code[4];
-    };
-    
-    struct Label {
-        unsigned char labelLength;
-        char label[256];
-    };
-    
-    struct Description {
-        unsigned char descriptionLength;
-        char description[256];
-    };
-
-    struct Key {
-        char key[4];
-        char keyDataType[4];
-        unsigned short keyDataLength;
-        unsigned char keyData[65536];
-    };
-
-    struct Event {
-        Trigger trigger;
-        Label label;
-        Description description;
-        Key key;
-    };
-	#pragma pack(pop)
-    
+namespace NetStation {    
     extern const char kMac[4];
     extern const char kUnix[4];
     extern const char kIntel[4];
@@ -91,7 +57,7 @@ namespace NetStation {
 
     class SocketEx : public Socket {
     protected:
-        char m_commandBuffer[ sizeof(Event) ];
+        char m_commandBuffer[ 65536 + 1 ];
     
     public:
         static const char kQuery;
@@ -112,9 +78,8 @@ namespace NetStation {
         bool sendBeginRecording() const;
         bool sendEndRecording() const;
         bool sendAttention() const;
-        bool sendTimeSynch(int timeInMilliseconds);
-        bool sendTrigger(Trigger& trigger);
-        bool sendEvent(Event& event);                
+        bool sendSynch(long timeStamp);
+        bool sendTrigger(const char* code, long timeStamp, long msDuration);
     };
     
     class EGIConnection {
@@ -126,6 +91,7 @@ namespace NetStation {
             bool disconnect();
             bool beginRecording();
             bool endRecording();
+			bool sendAttention();
 			bool sendSynch(long timeStamp);
             bool sendTrigger(const char *code, long timeStamp, long msDuration);
     };
