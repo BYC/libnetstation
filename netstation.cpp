@@ -22,7 +22,6 @@
  THE SOFTWARE. 
  */
 
-#include <cstdio>
 #include <cstring>
 
 #if defined(_WIN32) || defined(_WIN64)
