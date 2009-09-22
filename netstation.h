@@ -72,8 +72,8 @@ namespace NetStation {
         bool sendBeginRecording() const;
         bool sendEndRecording() const;
         bool sendAttention() const;
-        bool sendSynch(long timeStamp);
-        bool sendTrigger(const char* code, long timeStamp, long msDuration);
+        bool sendSynch(int timeStamp);
+        bool sendTrigger(const char* code, int timeStamp, int msDuration);
     };
 }
 

@@ -208,7 +208,7 @@ namespace NetStation {
         return this->sendCommand(&kAttention, sizeof(kAttention));
 	}
     
-    bool EGIConnection::sendSynch(long timeStamp) {
+    bool EGIConnection::sendSynch(int timeStamp) {
         size_t offset = 0;
 		        
         this->m_commandBuffer[offset] = kTimeSynch;
@@ -220,7 +220,7 @@ namespace NetStation {
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
 
-    bool EGIConnection::sendTrigger(const char* code, long timeStamp, long msDuration) {
+    bool EGIConnection::sendTrigger(const char* code, int timeStamp, int msDuration) {
         size_t offset = 0;
 		
         this->m_commandBuffer[offset] = kEventDataStream;
