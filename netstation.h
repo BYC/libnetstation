@@ -27,8 +27,9 @@
 #ifndef libnetstation_h
 #define libnetstation_h
 
+#include <stddef.h>
 namespace NetStation {    	
-	
+
 #if defined(_WIN32) || defined(_WIN64)
 #include <winsock2.h> // Required for SOCKET type
 //#pragma comment(lib,"ws2_32.lib") // Automatically link to the winsock 2 library

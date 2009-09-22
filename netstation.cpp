@@ -22,6 +22,7 @@
  THE SOFTWARE. 
  */
 
+#include <cstdio>
 #include <cstring>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -142,8 +143,7 @@ namespace NetStation {
 		#if defined(_WIN32) || defined(_WIN64)
 		WSADATA wsaData;	
 		if(WSAStartup(MAKEWORD(1,1),&wsaData) != 0){
-			std::cerr << "WSAStartup failed." << std::endl;
-			exit(1);
+			return false;
 		}
 		#endif
 		
@@ -185,26 +185,34 @@ namespace NetStation {
         
         this->m_commandBuffer[offset] = kQuery;
         offset += sizeof(kQuery);
+		
         
-        memcpy(&this->m_commandBuffer[offset], systemSpec, sizeof(systemSpec));
-        offset += sizeof(systemSpec);
-        
+        memcpy(&this->m_commandBuffer[offset], systemSpec, sizeof(char) * 4);
+        offset += sizeof(char) * 4;
+
+		printf("sizeof(kQuery): %ld\n", sizeof(kQuery));
+		printf("sizeof(systemSpec): %ld\n", sizeof(char) * 4);
+		printf("sendBeginSession offset: %ld\n", offset);
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
     
     bool EGIConnection::sendEndSession() const {
+		printf("sizeof(kExit): %ld\n", sizeof(kExit));
         return this->sendCommand(&kExit, sizeof(kExit));
     }
 
     bool EGIConnection::sendBeginRecording() const {
+		printf("sizeof(kBeginRecording): %ld\n", sizeof(kBeginRecording));
         return this->sendCommand(&kBeginRecording, sizeof(kBeginRecording));
     }
     
     bool EGIConnection::sendEndRecording() const {
+		printf("sizeof(kEndRecording): %ld\n", sizeof(kEndRecording));
         return this->sendCommand(&kEndRecording, sizeof(kEndRecording));
     }
     
     bool EGIConnection::sendAttention() const {
+		printf("sizeof(kAttention): %ld\n", sizeof(kAttention));
         return this->sendCommand(&kAttention, sizeof(kAttention));
 	}
     
@@ -217,6 +225,10 @@ namespace NetStation {
         memcpy(&this->m_commandBuffer[offset], &timeStamp, sizeof(timeStamp));
         offset += sizeof(timeStamp);
 		
+		printf("sizeof(kTimeSynch): %ld\n", sizeof(kTimeSynch));
+		printf("sizeof(timeStamp): %ld\n", sizeof(timeStamp));
+		printf("synch offset: %ld\n", offset);
+
         return this->sendCommand(&this->m_commandBuffer[0], offset);
     }
 
@@ -242,6 +254,12 @@ namespace NetStation {
 		memset(&this->m_commandBuffer[offset], 0, 13);
 		offset += 13;
 		
+		printf("sizeof(kEventDataStream): %ld\n", sizeof(kEventDataStream));
+		printf("sizeof(dataSize): %ld\n", sizeof(dataSize));
+		printf("sizeof(timeStamp): %ld\n", sizeof(timeStamp));
+		printf("sizeof(msDuration): %ld\n", sizeof(msDuration));
+		printf("trigger offset: %ld\n", offset);
+
         return this->sendCommand(&this->m_commandBuffer[0], offset); 	
     }    
 }
