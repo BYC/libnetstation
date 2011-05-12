@@ -1,3 +1,0 @@
-all:
-	g++ -shared -I /usr/include/python2.6/ -lpython2.6 -o py_netstation.so py_netstation.cpp netstation.cpp netstation.h
-	
